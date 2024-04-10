@@ -24,9 +24,15 @@ for filename in os.listdir(current_directory):
         # Attempt to merge NODE_CLASS_MAPPINGS and NODE_DISPLAY_NAME_MAPPINGS
         if hasattr(module, 'NODE_CLASS_MAPPINGS'):
             NODE_CLASS_MAPPINGS.update(module.NODE_CLASS_MAPPINGS)
+            # Print the names of nodes loaded from this module
+            for node_name in module.NODE_CLASS_MAPPINGS.keys():
+                print(f"Loaded node class: {node_name}")
         
         if hasattr(module, 'NODE_DISPLAY_NAME_MAPPINGS'):
             NODE_DISPLAY_NAME_MAPPINGS.update(module.NODE_DISPLAY_NAME_MAPPINGS)
+            # Optionally, print the display names as well
+            for display_name in module.NODE_DISPLAY_NAME_MAPPINGS.values():
+                print(f"Loaded node display name: {display_name}")
 
 # Export merged mappings
 __all__ = ['NODE_CLASS_MAPPINGS', 'NODE_DISPLAY_NAME_MAPPINGS']
