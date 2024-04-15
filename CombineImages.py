@@ -46,8 +46,8 @@ class CombineImagesSideBySide:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "image1": ("IMAGE",),  # First image to be placed on the left
-                "image2": ("IMAGE",),  # Second image to be placed on the right
+                "image1": ("IMAGE",),  # color image to be placed on the left
+                "image2": ("IMAGE",),  # depth image to be placed on the right
             }
         }
 
@@ -61,6 +61,9 @@ class CombineImagesSideBySide:
             return (image2,)
         if image2 is None:
             return (image1,)
+        
+        print(f"Image 1 Shape: {image1.shape}")
+        print(f"Image 2 Shape: {image2.shape}")
 
         # Resize image2 to match the height of image1
         target_height = image1.shape[1]

@@ -120,52 +120,63 @@ def lanczos(samples, width, height):
     return result.to(samples.device, samples.dtype)
 
 def common_upscale(samples, width, height, upscale_method, crop):
-        if crop == "center":
-            old_width = samples.shape[3]
-            old_height = samples.shape[2]
-            old_aspect = old_width / old_height
-            new_aspect = width / height
-            x = 0
-            y = 0
-            if old_aspect > new_aspect:
-                x = round((old_width - old_width * (new_aspect / old_aspect)) / 2)
-            elif old_aspect < new_aspect:
-                y = round((old_height - old_height * (old_aspect / new_aspect)) / 2)
-            s = samples[:,:,y:old_height-y,x:old_width-x]
-        else:
-            s = samples
+    if crop == "center":
+        old_width = samples.shape[3]
+        old_height = samples.shape[2]
+        old_aspect = old_width / old_height
+        new_aspect = width / height
+        x = 0
+        y = 0
+        if old_aspect > new_aspect:
+            x = round((old_width - old_width * (new_aspect / old_aspect)) / 2)
+        elif old_aspect < new_aspect:
+            y = round((old_height - old_height * (old_aspect / new_aspect)) / 2)
+        s = samples[:,:,y:old_height-y,x:old_width-x]
+    else:
+        s = samples
 
-        if upscale_method == "bislerp":
-            return bislerp(s, width, height)
-        elif upscale_method == "lanczos":
-            return lanczos(s, width, height)
-        else:
-            return torch.nn.functional.interpolate(s, size=(height, width), mode=upscale_method)
+    if upscale_method == "bislerp":
+        return bislerp(s, width, height)
+    elif upscale_method == "lanczos":
+        return lanczos(s, width, height)
+    else:
+        return torch.nn.functional.interpolate(s, size=(height, width), mode=upscale_method)
 
 class MaintainAspectRatio:
+    RETURN_TYPES = ("IMAGE",)
+    FUNCTION = "process_image"
+    CATEGORY = "Null Nodes"
+
     upscale_methods = ["nearest-exact", "bilinear", "area", "bicubic", "bislerp", "lanczos"]
     crop_methods = ["disabled", "center", "maintain-aspect-ratio"]
+    color_modes = ["RGB", "RGBA"]
 
     @classmethod
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "image": ("IMAGE",),  # Assuming 'image' is a tensor in [B, H, W, C] format
+                "image": ("IMAGE",),  # Assuming 'image' is a tensor in [B, C, H, W] format
                 "upscale_method": (cls.upscale_methods,),
                 "width": ("INT", {"default": 512, "min": 64, "max": 4096, "step": 8}),
                 "height": ("INT", {"default": 512, "min": 64, "max": 4096, "step": 8}),
                 "crop_method": (cls.crop_methods,),
+                "color_mode": (cls.color_modes,),  # New input for selecting color mode
             }
         }
 
-    RETURN_TYPES = ("IMAGE",)
-    FUNCTION = "process_image"
-    CATEGORY = "Null Nodes"
-
-    def process_image(self, image, upscale_method, width, height, crop_method):
+    def process_image(self, image, upscale_method, width, height, crop_method, color_mode):
         # Ensure image tensor is in the correct format [B, C, H, W] for common_upscale
         image_bcwh = image.movedim(-1, 1)  # Move channels from last to second position
-        
+
+        # Check and modify image channel count based on color_mode selection
+        if color_mode == "RGBA" and image_bcwh.shape[1] == 3:
+            # Add an alpha channel if needed
+            alpha_channel = torch.ones((image_bcwh.shape[0], 1, image_bcwh.shape[2], image_bcwh.shape[3]), dtype=image.dtype, device=image.device)
+            image_bcwh = torch.cat((image_bcwh, alpha_channel), dim=1)
+        elif color_mode == "RGB" and image_bcwh.shape[1] == 4:
+            # Remove the alpha channel if present
+            image_bcwh = image_bcwh[:, :3, :, :]
+
         # Adjust width and height to maintain aspect ratio if required
         original_width = image_bcwh.shape[3]
         original_height = image_bcwh.shape[2]
@@ -183,7 +194,7 @@ class MaintainAspectRatio:
 
         # Adjust the resized image tensor back to original format [B, H, W, C]
         resized_image = resized_image_bcwh.movedim(1, -1)
-        
+
         return (resized_image,)
 
 NODE_CLASS_MAPPINGS = {
